@@ -1,0 +1,71 @@
+//@version=5
+strategy("Combined Strategy", overlay=true, default_qty_value=100, initial_capital=1000, margin_long=0.1)
+
+// Parámetros para el indicador ADX
+adxlen = input(7, title="ADX Suavizado")
+dilen = input(7, title="Longitud DI")
+
+// Función para calcular el ADX
+adx(dilen, adxlen) =>
+    up = ta.change(high)
+    down = -ta.change(low)
+    plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+    minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+    truerange = ta.rma(ta.tr, dilen)
+    plus = fixnan(100 * ta.rma(plusDM, dilen) / truerange)
+    minus = fixnan(100 * ta.rma(minusDM, dilen) / truerange)
+    sum = plus + minus
+    adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+    adx
+
+// Función para el Supertrend
+pine_supertrend(factor, atrPeriod) =>
+    src = hl2
+    atr = ta.atr(atrPeriod)
+    upperBand = src + factor * atr
+    lowerBand = src - factor * atr
+    prevLowerBand = nz(lowerBand[1])
+    prevUpperBand = nz(upperBand[1])
+
+    lowerBand := lowerBand > prevLowerBand or close[1] < prevLowerBand ? lowerBand : prevLowerBand
+    upperBand := upperBand < prevUpperBand or close[1] > prevUpperBand ? upperBand : prevUpperBand
+    int direction = na
+    float superTrend = na
+    prevSuperTrend = superTrend[1]
+    if na(atr[1]) and ta.rsi(close, 21) < 66 and ta.rsi(close,3) > 80 and ta.rsi(close, 28) > 49
+        direction := 1
+    else if prevSuperTrend == prevUpperBand
+        direction := close > upperBand ? -1 : 1
+    else
+        direction := close < lowerBand ? 1 : -1
+    superTrend := direction == -1 ? lowerBand : upperBand
+    [superTrend, direction]
+
+[pineSupertrend, pineDirection] = pine_supertrend(3, 10)
+upTrend = pineDirection < 0
+downTrend = pineDirection > 0
+
+// Media Móvil de 20 periodos
+sma20 = ta.sma(close, 20)
+
+// RSI y niveles de sobrecompra/sobreventa
+a = ta.rsi(close,14)
+OB = input(70)
+OS = input(30)
+os = a > OB
+ob = a < OS
+
+// Entradas y salidas de la estrategia
+if upTrend and close > pineSupertrend and close > sma20 and os
+    strategy.entry("Long", strategy.long)
+
+if ta.crossunder(close, sma20) or ob
+    strategy.close_all("Cerrar operación")
+
+// Entrada basada en breakout del canal
+length = input.int(title="Longitud", minval=1, maxval=1000, defval=5)
+upBound = ta.highest(high, length)
+downBound = ta.lowest(low, length)
+if (not na(close[length]))
+    strategy.entry("Long", strategy.long, stop=upBound + syminfo.mintick, comment="Long")
+    strategy.entry("Short", strategy.short, stop=downBound - syminfo.mintick, comment="Short")

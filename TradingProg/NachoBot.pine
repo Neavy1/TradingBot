@@ -1,0 +1,52 @@
+//@version=5
+strategy("EMA Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=8, initial_capital=500)
+
+// Capital inicial y tamaño de posición por defecto
+capital_inicial = 500
+risk_per_trade = 0.02
+tp_percentage = 0.007
+sl_percentage = 0.02
+
+// Funciones para calcular el take profit y stop loss en base al porcentaje
+calculate_tp(price, percentage) =>
+    price + (price * percentage)
+    
+calculate_sl(price, percentage) =>
+    price - (price * percentage)
+
+// Media Móvil Exponencial de 50 periodos
+ema50 = ta.ema(close, 50)
+
+// Media Móvil Exponencial de 200 periodos
+ema200 = ta.ema(close, 200)
+
+// Diferencia porcentual entre las EMAs
+emaDiffPct = (ema50 - ema200) / ema200 * 100
+
+// Condiciones de entrada y salida de la estrategia
+longCondition = ema50 > ema200 and emaDiffPct >= 1
+shortCondition = ema50 < ema200 and emaDiffPct >= 1
+
+if longCondition
+    tp = calculate_tp(close, tp_percentage)
+    sl = calculate_sl(close, sl_percentage)
+    strategy.entry("Long", strategy.long, stop=sl, limit=tp)
+
+if shortCondition
+    tp = calculate_tp(close, tp_percentage)
+    sl = calculate_sl(close, sl_percentage)
+    strategy.entry("Short", strategy.short, stop=sl, limit=tp)
+
+// Obtener el número de operaciones abiertas
+num_open_trades = strategy.opentrades
+
+if num_open_trades > 0
+    for i = 0 to num_open_trades - 1
+        trade_entry_price = strategy.opentrades.entry_price(i)
+        current_price = close
+        // Asegurarse de que la comparación sea entre valores del mismo tipo
+        trade_direction_long = current_price > trade_entry_price
+        sl = calculate_sl(trade_entry_price, sl_percentage)
+        tp = calculate_tp(trade_entry_price, tp_percentage)
+        // Usar la variable booleana en la condición
+        strategy.exit("TP/SL" + str.tostring(i), from_entry=trade_direction_long ? "Long" : "Short", limit=tp, stop=sl)

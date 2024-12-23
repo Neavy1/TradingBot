@@ -1,0 +1,41 @@
+study("15 min system", overlay=true)
+tf = input(60)
+b = timeframe.isintraday and timeframe.multiplier >= 1 ? 
+   tf / timeframe.multiplier * 7 : 
+   timeframe.isintraday and timeframe.multiplier < 60 ? 
+   60 / timeframe.multiplier * 24 * 7 : 7
+
+
+L = lowest(close, b)
+h1 = highest(open, b)
+h2 = highest(open, b - 1)
+h3 = highest(open, b - 2)
+
+H = valuewhen(open > h1[1], open, 0)
+bo = h3 < h2
+upper = valuewhen(barssince(open > h1[1]) == b - 2 and bo, H, 0)
+lower = valuewhen(barssince(open > h1[1]) == b - 2 and bo, L, 0)
+
+plot(upper,  style=plot.style_line, color=color.gray,linewidth=2)
+plot(lower, style=plot.style_line, color=color.black, linewidth=2)
+
+//
+res = input("240", type=input.resolution)
+
+o = security(syminfo.tickerid, res, open, barmerge.gaps_off, barmerge.lookahead_on)
+c = security(syminfo.tickerid, res, close, barmerge.gaps_off, barmerge.lookahead_on)
+h = security(syminfo.tickerid, res, high, barmerge.gaps_off, barmerge.lookahead_on)
+l = security(syminfo.tickerid, res, low, barmerge.gaps_off, barmerge.lookahead_on)
+
+
+
+col = c >= o ? color.lime : color.red
+
+ppo = plot(b ? o >= c ? h : l : o, color=col, title="Open", style=plot.style_stepline, transp=100)
+ppc = plot(b ? o <= c ? h : l : c, color=col, title="Close", style=plot.style_stepline, transp=100)
+
+plot(b and h > c ? h : na, color=col, title="High", style=plot.style_circles, linewidth=2,transp=60)
+plot(b and l < c ? l : na, color=col, title="Low", style=plot.style_circles,linewidth=2, transp=60)
+
+fill(ppo, ppc, col)
+
